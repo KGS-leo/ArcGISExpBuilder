@@ -1,0 +1,17 @@
+{
+  "name": "api-getter",
+  "label": "API Getter",
+  "type": "widget",
+  "version": "1.0.0",
+  "exbVersion": "1.19",
+  "author": "You",
+  "description": "Calls external API via GET and shows results.",
+  "defaultSize": {
+    "width": 400,
+    "height": 300
+  },
+  "supportedTypes": ["Data Source"],
+  "properties": {
+    "supportInlineEditing": false
+  }
+}
