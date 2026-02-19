@@ -1,0 +1,254 @@
+{
+	"src": {
+		"primary": {
+			"color": "#076fe5"
+		},
+		"secondary": {
+			"color": "#c5c5c5"
+		},
+		"error": {
+			"color": "#e1001b"
+		},
+		"warning": {
+			"color": "#ffea1d"
+		},
+		"info": {
+			"color": "#089bdc"
+		},
+		"success": {
+			"color": "#09cf74"
+		},
+		"neutral": {
+			"color": "#828282"
+		}
+	},
+	"ref": {
+		"typeface": {
+			"customFonts": [
+				{
+					"name": "Roboto",
+					"url": "https://fonts.googleapis.com/css2?family=Roboto&display=swap"
+				}
+			],
+			"fontFamily": "Roboto",
+			"fontSize": 13,
+			"fontWeightLight": 300,
+			"fontWeightRegular": 400,
+			"fontWeightMedium": 500,
+			"fontWeightSemiBold": 600,
+			"fontWeightBold": 700,
+			"htmlFontSize": "16px"
+		},
+		"palette": {
+			"white": "#fff",
+			"black": "#000",
+			"primary": {
+				"100": "#e6f2ff",
+				"200": "#acd3ff",
+				"300": "#65adff",
+				"400": "#2c8fff",
+				"500": "#076fe5",
+				"600": "#005eca",
+				"700": "#004ca3",
+				"800": "#003c82",
+				"900": "#002958"
+			},
+			"secondary": {
+				"100": "#f0f0f0",
+				"200": "#e3e3e3",
+				"300": "#d5d5d5",
+				"400": "#c5c5c5",
+				"500": "#b6b6b6",
+				"600": "#a8a8a8",
+				"700": "#989898",
+				"800": "#8b8b8b",
+				"900": "#828282"
+			},
+			"info": {
+				"100": "#e5f7ff",
+				"200": "#9fe2ff",
+				"300": "#60ceff",
+				"400": "#21bbff",
+				"500": "#089bdc",
+				"600": "#0077ac",
+				"700": "#005a82",
+				"800": "#003b56",
+				"900": "#002231"
+			},
+			"success": {
+				"100": "#ebfff6",
+				"200": "#acffd9",
+				"300": "#56f8ad",
+				"400": "#16ed8a",
+				"500": "#09cf74",
+				"600": "#03b161",
+				"700": "#00904e",
+				"800": "#006838",
+				"900": "#004022"
+			},
+			"warning": {
+				"100": "#fffdeb",
+				"200": "#fff9c3",
+				"300": "#fff592",
+				"400": "#fff05f",
+				"500": "#ffea1d",
+				"600": "#eed800",
+				"700": "#d4c000",
+				"800": "#b5a400",
+				"900": "#938500"
+			},
+			"danger": {
+				"100": "#ffe9ec",
+				"200": "#ff94a1",
+				"300": "#ff5066",
+				"400": "#ff203c",
+				"500": "#e1001b",
+				"600": "#bf0017",
+				"700": "#9f0013",
+				"800": "#79000f",
+				"900": "#4a0009"
+			}
+		}
+	},
+	"sys": {
+		"color": {
+			"mode": "light",
+			"light": {
+				"primary": {
+					"main": "#076fe5"
+				},
+				"secondary": {
+					"main": "#c5c5c5",
+					"text": "#050505"
+				},
+				"error": {
+					"main": "#e1001b"
+				},
+				"warning": {
+					"main": "#ffea1d"
+				},
+				"info": {
+					"main": "#089bdc"
+				},
+				"success": {
+					"main": "#09cf74"
+				},
+				"surface": {
+					"background": "#f0f0f0",
+					"backgroundText": "#050505",
+					"backgroundHint": "#6a6a6a",
+					"paper": "#ffffff",
+					"paperText": "#050505",
+					"paperHint": "#6a6a6a",
+					"overlay": "#f0f0f0",
+					"overlayText": "#050505",
+					"overlayHint": "#6a6a6a",
+					"header": "#004ca3",
+					"headerText": "#f0f0f0",
+					"headerHint": "#d5d5d5",
+					"footer": "#f0f0f0",
+					"footerText": "#050505",
+					"footerHint": "#6a6a6a"
+				},
+				"action": {
+					"link": {
+						"default": "#076fe5",
+						"hover": "#005eca"
+					},
+					"inputField": {
+						"default": "#ffffff",
+						"text": "#050505",
+						"placeholder": "#6a6a6a"
+					},
+					"default": "#ffffff",
+					"hover": "#f5f5f5",
+					"pressed": "#e6e6e6",
+					"text": "#050505",
+					"focus": "#d5d5d5",
+					"selected": "#e6f0ff",
+					"disabled": "#cccccc"
+				},
+				"divider": {
+					"primary": "#d5d5d5"
+				}
+			}
+		},
+		"shape": {
+			"shape1": "0",
+			"shape2": "0.25rem",
+			"inputField": "0.125rem"
+		},
+		"shadow": {
+			"shadow1": "0 0 6px 0 rgba(0,0,0,0.15)",
+			"shadow2": "0 0 10px 1px rgba(0,0,0,0.2)",
+			"shadow3": "0 0 20px 2px rgba(0,0,0,0.2)"
+		},
+		"spacing": [
+			0,
+			"0.25rem",
+			"0.5rem",
+			"0.75rem",
+			"1rem",
+			"1.25rem",
+			"1.5rem",
+			"1.75rem",
+			"2rem",
+			"2.25rem",
+			"2.5rem",
+			"2.75rem",
+			"3rem"
+		],
+		"typography": {
+			"h1": {
+				"fontSize": "1.875rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"h2": {
+				"fontSize": "1.5rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"h3": {
+				"fontSize": "1.25rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"h4": {
+				"fontSize": "1.125rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"h5": {
+				"fontSize": "1rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"h6": {
+				"fontSize": "0.875rem",
+				"fontWeight": 500,
+				"lineHeight": 1.5
+			},
+			"body": {
+				"fontSize": "0.875rem",
+				"fontWeight": 400,
+				"lineHeight": 1.5
+			},
+			"label1": {
+				"fontSize": "0.75rem",
+				"fontWeight": 400,
+				"lineHeight": 1.5
+			},
+			"label2": {
+				"fontSize": "0.625rem",
+				"fontWeight": 400,
+				"lineHeight": 1.5
+			},
+			"inputField": {
+				"fontSize": "0.875rem",
+				"fontWeight": 400,
+				"lineHeight": 1.3
+			}
+		}
+	}
+}
