@@ -15,13 +15,13 @@
 3. **Running the Application**
    - Start the client:
        cd client  
-       npm cli 
+       npm ci 
        npm start  
      This runs the custom functionality in the background.
 
    - Start the server:
        cd server  
-       npm cli 
+       npm ci 
        npm start  
      This runs the Experience Builder platform.
 
