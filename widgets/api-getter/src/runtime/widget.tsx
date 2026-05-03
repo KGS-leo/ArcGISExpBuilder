@@ -1,47 +1,168 @@
 
-import React, { useState } from 'react'
-import { type AllWidgetProps, DataSourceComponent } from 'jimu-core'
-import { Button, TextInput, Alert, Loading } from 'jimu-ui'
+import React, { useState, useEffect } from 'react'
+import { type AllWidgetProps, DataSourceComponent, SessionManager } from 'jimu-core'
+import { Button, Alert, Loading, Select, Option } from 'jimu-ui'
 import type { DataSource, DataRecord, QueriableDataSource, ArcGISQueryParams } from 'jimu-core'
+import { JimuMapViewComponent, type JimuMapView } from 'jimu-arcgis'
 
 export default function Widget (props: AllWidgetProps<any>) {
-  const [table, setTable] = useState('1')
-  const [location, setLocation] = useState('LF1')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [fileUrl, setFileUrl] = useState<string>('')
+  const [fileName, setFileName] = useState<string>('document.docx')
   const [error, setError] = useState<string>('')
+  const [userToken, setUserToken] = useState<string>('')
+  const [userName, setUserName] = useState<string>('')
+  const [requestUrl, setRequestUrl] = useState<string>('')
   
   // For feature layer data
   const [featureLayerRecords, setFeatureLayerRecords] = useState<DataRecord[]>([])
   const [featureLayerLoading, setFeatureLayerLoading] = useState(false)
+  
+  // For map widget interaction
+  const [mapUrl, setMapUrl] = useState<string>('')
+  const [mapName, setMapName] = useState<string>('')
+  const [layerUrls, setLayerUrls] = useState<Array<{title: string, url: string, type: string}>>([])
+  const [activeView, setActiveView] = useState<JimuMapView>(null)
+  const [selectedGlobalID, setSelectedGlobalID] = useState<string>('')
+  const [selectedFeatureInfo, setSelectedFeatureInfo] = useState<any>(null)
+  const [selectedReportTemplate, setSelectedReportTemplate] = useState<string>('')
+  const [availableTemplates, setAvailableTemplates] = useState<string[]>([])
+  const [reportDict, setReportDict] = useState<Record<string, string[]>>({})
+
+  // Get user token and username
+  useEffect(() => {
+    const session = SessionManager.getInstance().getMainSession()
+    if (session) {
+      setUserToken(session.token || '')
+      setUserName(session.username || 'Unknown user')
+    } else {
+      setUserToken('')
+      setUserName('Not logged in')
+    }
+  }, [])
+
+  // Fetch report dictionary from API
+  useEffect(() => {
+    const fetchReportDict = async () => {
+      try {
+        const response = await fetch('https://erma.kgsgroup.com:5001/api/v1/arcgis-enterprise/GetReportDict', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`
+          }
+        })
+        
+        if (!response.ok) {
+          console.error('Failed to fetch report dictionary:', response.status, response.statusText)
+          return
+        }
+        
+        const data = await response.json()
+        setReportDict(data)
+      } catch (error) {
+        console.error('Error fetching report dictionary:', error)
+      }
+    }
+    
+    if (userToken) {
+      fetchReportDict()
+    }
+  }, [userToken])
+
+  // Update available templates when map URL or report dict changes
+  useEffect(() => {
+    if (!reportDict || Object.keys(reportDict).length === 0) return
+
+    const normalizeUrl = (url: string) => url.replace(/\/\d+$/, '').replace(/\/$/, '')
+    
+    let templates: string[] = []
+    for (const layer of layerUrls) {
+      if (!layer.url) continue
+      const normalizedLayerUrl = normalizeUrl(layer.url)
+      
+      for (const dictKey of Object.keys(reportDict)) {
+        if (normalizedLayerUrl === normalizeUrl(dictKey)) {
+          templates = reportDict[dictKey]
+          break
+        }
+      }
+      if (templates.length > 0) break
+    }
+
+    setAvailableTemplates(templates)
+    if (!templates.includes(selectedReportTemplate) && templates.length > 0) {
+      setSelectedReportTemplate(templates[0])
+    }
+  }, [layerUrls, reportDict])
 
   const callApi = async () => {
     setLoading(true)
     setError('')
-    setResult(null)
+    setFileUrl('')
 
     try {
-      const params = new URLSearchParams({ table, location })
-      const url = `https://erma.kgsgroup.com:5001/api/v1/ErmaPsql/ViewReport?${params.toString()}`
+      // Check if we have required parameters
+      if (!layerUrls.length || !layerUrls[0].url) {
+        throw new Error('No feature layer URL available. Please connect a map with layers.')
+      }
+      if (!selectedGlobalID) {
+        throw new Error('No feature selected. Please click a feature on the map first.')
+      }
+      
+      // Find the first FeatureServer URL (not basemap/style URLs)
+      const featureLayer = layerUrls.find(layer => 
+        layer.url && layer.url.includes('FeatureServer')
+      )
+      
+      if (!featureLayer) {
+        throw new Error('No FeatureServer layer found in the map. Please add a feature layer.')
+      }
+      
+      const featureUrl = encodeURIComponent(featureLayer.url)
+      const objectId = selectedGlobalID
+      const url = `https://erma.kgsgroup.com:5001/api/v1/arcgis-enterprise/GetVegeLayerComplete?featureUrl=${featureUrl}&objectId=${objectId}&token=${userToken}`
+      
+      // Store the request URL for display
+      setRequestUrl(url)
 
       const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
+        method: 'GET'
       })
 
       if (!res.ok) {
         throw new Error(`API returned ${res.status} ${res.statusText}`)
       }
 
-      // If your API returns JSON:
-      const data = await res.json()
-      setResult(data)
+      // Handle file response
+      const blob = await res.blob()
+      
+      // Extract filename from Content-Disposition header if available
+      const contentDisposition = res.headers.get('Content-Disposition')
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (filenameMatch && filenameMatch[1]) {
+          setFileName(filenameMatch[1].replace(/['"]/g, ''))
+        }
+      }
+      
+      // Create a download URL
+      const url_blob = URL.createObjectURL(blob)
+      setFileUrl(url_blob)
     } catch (e: any) {
       setError(e?.message ?? 'Request failed (check CORS/SSL)')
     } finally {
       setLoading(false)
     }
   }
+
+  // Clean up blob URL when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl)
+      }
+    }
+  }, [fileUrl])
 
   // Query feature layer data
   const queryFeatureLayer = async (dataSource: DataSource) => {
@@ -61,7 +182,6 @@ export default function Widget (props: AllWidgetProps<any>) {
       const queryResult = await queryableDs.query(queryParams)
       
       setFeatureLayerRecords(queryResult.records)
-      console.log('Feature Layer Records:', queryResult.records)
     } catch (e: any) {
       setError('Failed to query feature layer: ' + e.message)
     } finally {
@@ -71,9 +191,74 @@ export default function Widget (props: AllWidgetProps<any>) {
 
   // Handle data source ready
   const onDataSourceCreated = (dataSource: DataSource) => {
-    console.log('Data source created:', dataSource)
-    // Auto-query when data source is ready
     queryFeatureLayer(dataSource)
+  }
+
+  // Handle map view changes
+  const onActiveViewChange = (jmv: JimuMapView) => {
+    if (jmv) {
+      setActiveView(jmv)
+      // Get the map's URL and other info
+      const view = jmv.view
+      if (view && view.map) {
+        // For web maps with portal items
+        if (view.map.portalItem) {
+          const itemUrl = `${view.map.portalItem.portal.url}/home/item.html?id=${view.map.portalItem.id}`
+          setMapUrl(itemUrl)
+          setMapName(view.map.portalItem.title || 'Untitled Map')
+        } else {
+          // For maps without portal items, show layer info
+          const layerCount = view.map.allLayers.length
+          setMapUrl(`Map loaded with ${layerCount} layer(s)`)
+          setMapName(view.map.title || 'Local Map')
+        }
+        
+        // Extract all layer URLs
+        const layers: Array<{title: string, url: string, type: string}> = []
+        view.map.allLayers.forEach((layer: any) => {
+          if (layer.url) {
+            layers.push({
+              title: layer.title || 'Untitled Layer',
+              url: layer.url,
+              type: layer.type || 'Unknown'
+            })
+          }
+        })
+        setLayerUrls(layers)
+        
+        // Add click event listener to capture clicked features
+        view.on('click', async (event: any) => {
+          try {
+            // Perform hit test to find clicked features
+            const response = await view.hitTest(event)
+            
+            if (response.results.length > 0) {
+              // Get the first clicked feature
+              const firstResult = response.results[0]
+              
+              // Check if it's a graphic with attributes
+              if (firstResult.graphic && firstResult.graphic.attributes) {
+                const attributes = firstResult.graphic.attributes
+                
+                // Try to get GlobalID (common field names)
+                const globalID = attributes.GlobalID || 
+                                attributes.GLOBALID || 
+                                attributes.globalid ||
+                                attributes.OBJECTID ||
+                                attributes.objectid ||
+                                attributes.FID ||
+                                'No ID found'
+                
+                setSelectedGlobalID(globalID)
+                setSelectedFeatureInfo(attributes)
+              }
+            }
+          } catch (error) {
+            console.error('Error in map click handler:', error)
+          }
+        })
+      }
+    }
   }
 
   // Get the first data source ID from useDataSources
@@ -81,20 +266,78 @@ export default function Widget (props: AllWidgetProps<any>) {
 
   return (
     <div style={{ padding: 12 }}>
-      <h3>External API Report</h3>
-
-      <div style={{ marginBottom: 8 }}>
-        <label>table</label>
-        <TextInput value={table} onChange={(e) => setTable(e.target.value)} />
+      <h3>User</h3>
+      <div style={{ 
+        padding: 10, 
+        background: '#f0f0f0', 
+        borderRadius: 4, 
+        marginBottom: 20,
+        wordBreak: 'break-all',
+        fontFamily: 'monospace',
+        fontSize: 12
+      }}>
+        login as: {userName}
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label>location</label>
-        <TextInput value={location} onChange={(e) => setLocation(e.target.value)} />
+      <h3>Current Map</h3>
+      <div style={{ 
+        padding: 10, 
+        background: mapName ? '#e6f7ff' : '#f0f0f0', 
+        borderRadius: 4, 
+        marginBottom: 20,
+        fontSize: 12
+      }}>
+        <div style={{ 
+          fontFamily: 'monospace', 
+          fontSize: 12,
+          wordBreak: 'break-all',
+          color: mapName ? '#333' : '#999'
+        }}>
+          {mapName || 'No map connected'}
+        </div>
       </div>
+
+      <h3>Selected Feature</h3>
+      <div style={{ 
+        padding: 10, 
+        background: selectedGlobalID ? '#fff4e6' : '#f0f0f0', 
+        borderRadius: 4, 
+        marginBottom: 20,
+        fontSize: 12
+      }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 8 }}>GlobalID:</div>
+        <div style={{ 
+          fontFamily: 'monospace', 
+          fontSize: 12,
+          wordBreak: 'break-all',
+          color: selectedGlobalID ? '#333' : '#999'
+        }}>
+          {selectedGlobalID || 'Click a feature on the map'}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>Report Template:</label>
+        <Select 
+          value={selectedReportTemplate} 
+          onChange={(e) => setSelectedReportTemplate(e.target.value)}
+          style={{ width: '100%' }}
+          disabled={availableTemplates.length === 0}
+        >
+          {availableTemplates.length > 0 ? (
+            availableTemplates.map((template) => (
+              <Option key={template} value={template}>{template}</Option>
+            ))
+          ) : (
+            <Option value="">No templates available</Option>
+          )}
+        </Select>
+      </div>
+
+      <h3>Vegetation Observation Report</h3>
 
       <Button type="primary" onClick={callApi} disabled={loading}>
-        {loading ? 'Calling…' : 'Submit'}
+        {loading ? 'Downloading…' : 'Get Vegetation Observation Document'}
       </Button>
 
       {loading && <div style={{ marginTop: 12 }}><Loading /></div>}
@@ -105,15 +348,27 @@ export default function Widget (props: AllWidgetProps<any>) {
         </div>
       )}
 
-      {result && (
-        <pre style={{ marginTop: 12, background: '#f6f6f6', padding: 10, maxHeight: 220, overflow: 'auto' }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
+      {fileUrl && (
+        <div style={{ marginTop: 12 }}>
+          <Alert form="basic" type="success" text="Document ready!" />
+          <div style={{ marginTop: 8 }}>
+            <a 
+              href={fileUrl} 
+              download={fileName}
+              style={{ 
+                display: 'inline-block',
+                padding: '8px 16px',
+                background: '#0079c1',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: '2px'
+              }}
+            >
+              Download {fileName}
+            </a>
+          </div>
+        </div>
       )}
-
-      {/* Feature Layer Data Section */}
-      <hr style={{ margin: '20px 0' }} />
-      <h3>Feature Layer Data</h3>
       
       {useDataSourceId ? (
         <>
@@ -138,9 +393,15 @@ export default function Widget (props: AllWidgetProps<any>) {
           )}
         </>
       ) : (
-        <p style={{ color: '#666', fontStyle: 'italic' }}>
-          No data source selected. Please configure a data source in the widget settings.
-        </p>
+        <p style={{ color: '#666', fontStyle: 'italic' }}></p>
+      )}
+      
+      {/* Connect to map widget */}
+      {props.useMapWidgetIds && props.useMapWidgetIds[0] && (
+        <JimuMapViewComponent
+          useMapWidgetId={props.useMapWidgetIds[0]}
+          onActiveViewChange={onActiveViewChange}
+        />
       )}
     </div>
   )
