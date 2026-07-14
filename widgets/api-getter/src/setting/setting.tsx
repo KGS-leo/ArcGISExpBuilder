@@ -1,15 +1,7 @@
 import { React, type AllWidgetSettingProps } from 'jimu-core'
-import { DataSourceSelector } from 'jimu-ui/advanced/data-source-selector'
 import { MapWidgetSelector } from 'jimu-ui/advanced/setting-components'
 
 export default function Setting (props: AllWidgetSettingProps<any>) {
-  const onDataSourceSelected = (useDataSources: any[]) => {
-    props.onSettingChange({
-      id: props.id,
-      useDataSources: useDataSources
-    })
-  }
-
   const onMapWidgetSelected = (useMapWidgetIds: string[]) => {
     props.onSettingChange({
       id: props.id,
@@ -25,21 +17,7 @@ export default function Setting (props: AllWidgetSettingProps<any>) {
         useMapWidgetIds={props.useMapWidgetIds}
       />
       <p style={{ marginTop: 10, fontSize: 14, color: '#666' }}>
-        Select a map widget to interact with and get its URL.
-      </p>
-
-      <hr style={{ margin: '20px 0' }} />
-
-      <h5>Select Data Source</h5>
-      <DataSourceSelector
-        types={['FEATURE_LAYER']}
-        useDataSources={props.useDataSources}
-        onChange={onDataSourceSelected}
-        widgetId={props.id}
-        mustUseDataSource
-      />
-      <p style={{ marginTop: 10, fontSize: 14, color: '#666' }}>
-        Select a feature layer to query and display its data.
+        Select a map widget to interact with and get map clicks.
       </p>
     </div>
   )

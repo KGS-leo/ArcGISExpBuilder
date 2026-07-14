@@ -1,4 +1,5 @@
 {
   "exampleConfigProperty": "default",
-  "useMapWidgetIds": []
+  "useMapWidgetIds": [],
+  "useDataSources": []
 }

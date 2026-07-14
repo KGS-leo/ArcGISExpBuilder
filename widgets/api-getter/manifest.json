@@ -11,5 +11,6 @@
     "setting": {
       "uri": "dist/setting/setting.js"
     }
-  }
+  },
+  "properties": {}
 }

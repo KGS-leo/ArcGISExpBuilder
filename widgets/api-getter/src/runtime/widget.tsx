@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react'
-import { type AllWidgetProps, DataSourceComponent, SessionManager } from 'jimu-core'
-import { Button, Alert, Loading, Select, Option } from 'jimu-ui'
-import type { DataSource, DataRecord, QueriableDataSource, ArcGISQueryParams } from 'jimu-core'
+import { type AllWidgetProps, SessionManager } from 'jimu-core'
+import { Button, Alert, Loading, Select, Option, TextInput } from 'jimu-ui'
 import { JimuMapViewComponent, type JimuMapView } from 'jimu-arcgis'
 
 export default function Widget (props: AllWidgetProps<any>) {
@@ -14,10 +13,6 @@ export default function Widget (props: AllWidgetProps<any>) {
   const [userName, setUserName] = useState<string>('')
   const [requestUrl, setRequestUrl] = useState<string>('')
   
-  // For feature layer data
-  const [featureLayerRecords, setFeatureLayerRecords] = useState<DataRecord[]>([])
-  const [featureLayerLoading, setFeatureLayerLoading] = useState(false)
-  
   // For map widget interaction
   const [mapUrl, setMapUrl] = useState<string>('')
   const [mapName, setMapName] = useState<string>('')
@@ -28,6 +23,13 @@ export default function Widget (props: AllWidgetProps<any>) {
   const [selectedReportTemplate, setSelectedReportTemplate] = useState<string>('')
   const [availableTemplates, setAvailableTemplates] = useState<string[]>([])
   const [reportDict, setReportDict] = useState<Record<string, string[]>>({})
+  
+  // Feature detail fields
+  const [projectName, setProjectName] = useState<string>('')
+  const [projectNumber, setProjectNumber] = useState<string>('')
+  const [createdUser, setCreatedUser] = useState<string>('')
+  const [createdDate, setCreatedDate] = useState<string>('')
+  const [featureDetailLoading, setFeatureDetailLoading] = useState(false)
 
   // Get user token and username
   useEffect(() => {
@@ -95,6 +97,81 @@ export default function Widget (props: AllWidgetProps<any>) {
     }
   }, [layerUrls, reportDict])
 
+  // Fetch feature details from GetFeatureReport API
+  const fetchFeatureDetails = async () => {
+    setFeatureDetailLoading(true)
+
+    try {
+      // Check if we have required parameters
+      if (!layerUrls.length || !layerUrls[0].url) {
+        console.warn('No feature layer URL available')
+        return
+      }
+      if (!selectedGlobalID) {
+        console.warn('No feature selected')
+        return
+      }
+      
+      // Find the first FeatureServer URL
+      const featureLayer = layerUrls.find(layer => 
+        layer.url && layer.url.includes('FeatureServer')
+      )
+      
+      if (!featureLayer) {
+        console.warn('No FeatureServer layer found')
+        return
+      }
+      
+      const featureUrl = encodeURIComponent(featureLayer.url)
+      const objectId = selectedGlobalID
+      const url = `https://erma.kgsgroup.com:5001/api/v1/arcgis-enterprise/GetFeatureReport?featureUrl=${featureUrl}&objectId=${objectId}&token=${userToken}`
+
+      const res = await fetch(url, {
+        method: 'GET'
+      })
+
+      if (!res.ok) {
+        console.warn(`API returned ${res.status} ${res.statusText}`)
+        return
+      }
+
+      // Parse JSON response
+      const data = await res.json()
+      
+      // Extract fields (handle different possible field names)
+      setProjectName(data.project_name || data.projectName || data.PROJECT_NAME || '')
+      setProjectNumber(data.project_number || data.projectNumber || data.PROJECT_NUMBER || '')
+      setCreatedUser(data.created_user || data.createdUser || data.CREATED_USER || data.Creator || '')
+      
+      // Handle created_date - could be timestamp or string
+      const rawDate = data.created_date || data.createdDate || data.CREATED_DATE || data.CreationDate || ''
+      if (rawDate) {
+        // Check if it's a timestamp (numeric)
+        const timestamp = typeof rawDate === 'number' ? rawDate : parseInt(rawDate)
+        if (!isNaN(timestamp)) {
+          const date = new Date(timestamp)
+          setCreatedDate(date.toLocaleDateString() + ' ' + date.toLocaleTimeString())
+        } else {
+          setCreatedDate(rawDate)
+        }
+      } else {
+        setCreatedDate('')
+      }
+      
+    } catch (e: any) {
+      console.error('Failed to fetch feature details:', e)
+    } finally {
+      setFeatureDetailLoading(false)
+    }
+  }
+
+  // Auto-fetch feature details when a feature is selected
+  useEffect(() => {
+    if (selectedGlobalID && layerUrls.length > 0 && userToken) {
+      fetchFeatureDetails()
+    }
+  }, [selectedGlobalID])
+
   const callApi = async () => {
     setLoading(true)
     setError('')
@@ -120,7 +197,7 @@ export default function Widget (props: AllWidgetProps<any>) {
       
       const featureUrl = encodeURIComponent(featureLayer.url)
       const objectId = selectedGlobalID
-      const url = `https://erma.kgsgroup.com:5001/api/v1/arcgis-enterprise/GetVegeLayerComplete?featureUrl=${featureUrl}&objectId=${objectId}&token=${userToken}`
+      const url = `https://erma.kgsgroup.com:5001/api/v1/arcgis-enterprise/GetFeatureComplete?featureUrl=${featureUrl}&objectId=${objectId}&token=${userToken}&reportName=${encodeURIComponent(selectedReportTemplate)}`
       
       // Store the request URL for display
       setRequestUrl(url)
@@ -136,14 +213,12 @@ export default function Widget (props: AllWidgetProps<any>) {
       // Handle file response
       const blob = await res.blob()
       
-      // Extract filename from Content-Disposition header if available
-      const contentDisposition = res.headers.get('Content-Disposition')
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
-        if (filenameMatch && filenameMatch[1]) {
-          setFileName(filenameMatch[1].replace(/['"]/g, ''))
-        }
-      }
+      // Generate custom filename: <template name>_<username>_<date>.docx
+      const templateName = selectedReportTemplate.replace(/\.docx$/i, '') // Remove .docx extension
+      const cleanUsername = userName.replace(/\./g, '') // Remove dots from username
+      const date = new Date().toISOString().split('T')[0].replace(/-/g, '') // YYYYMMDD format
+      const customFileName = `${templateName}_${cleanUsername}_${date}.docx`
+      setFileName(customFileName)
       
       // Create a download URL
       const url_blob = URL.createObjectURL(blob)
@@ -165,35 +240,6 @@ export default function Widget (props: AllWidgetProps<any>) {
   }, [fileUrl])
 
   // Query feature layer data
-  const queryFeatureLayer = async (dataSource: DataSource) => {
-    setFeatureLayerLoading(true)
-    setError('')
-    
-    try {
-      const queryableDs = dataSource as QueriableDataSource
-      
-      // Query all records (or use where clause)
-      const queryParams: ArcGISQueryParams = {
-        where: '1=1', // Get all records, or use specific SQL where clause
-        outFields: ['*'],
-        pageSize: 100
-      }
-      
-      const queryResult = await queryableDs.query(queryParams)
-      
-      setFeatureLayerRecords(queryResult.records)
-    } catch (e: any) {
-      setError('Failed to query feature layer: ' + e.message)
-    } finally {
-      setFeatureLayerLoading(false)
-    }
-  }
-
-  // Handle data source ready
-  const onDataSourceCreated = (dataSource: DataSource) => {
-    queryFeatureLayer(dataSource)
-  }
-
   // Handle map view changes
   const onActiveViewChange = (jmv: JimuMapView) => {
     if (jmv) {
@@ -257,12 +303,54 @@ export default function Widget (props: AllWidgetProps<any>) {
             console.error('Error in map click handler:', error)
           }
         })
+        
+        // Watch for map extent changes (happens when table zooms to feature)
+        // After zoom completes, check what feature is at the center
+        let extentChangeTimeout: any = null
+        view.watch('extent', () => {
+          // Clear previous timeout
+          if (extentChangeTimeout) {
+            clearTimeout(extentChangeTimeout)
+          }
+          
+          // Wait for zoom animation to complete (500ms delay)
+          extentChangeTimeout = setTimeout(async () => {
+            try {
+              // Hit test at the center of the view
+              const centerPoint = view.center
+              const screenPoint = view.toScreen(centerPoint)
+              const response = await view.hitTest(screenPoint)
+              
+              if (response.results.length > 0) {
+                const firstResult = response.results[0]
+                
+                if (firstResult.graphic && firstResult.graphic.attributes) {
+                  const attributes = firstResult.graphic.attributes
+                  
+                  const globalID = attributes.GlobalID || 
+                                  attributes.GLOBALID || 
+                                  attributes.globalid ||
+                                  attributes.OBJECTID ||
+                                  attributes.objectid ||
+                                  attributes.FID ||
+                                  null
+                  
+                  // Only update if we found a valid feature (not from map click)
+                  if (globalID) {
+                    console.log('Feature detected at map center (from table zoom):', globalID, attributes)
+                    setSelectedGlobalID(String(globalID))
+                    setSelectedFeatureInfo(attributes)
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error checking map center:', error)
+            }
+          }, 500)
+        })
       }
     }
   }
-
-  // Get the first data source ID from useDataSources
-  const useDataSourceId = props.useDataSources?.[0]?.dataSourceId
 
   return (
     <div style={{ padding: 12 }}>
@@ -297,24 +385,57 @@ export default function Widget (props: AllWidgetProps<any>) {
         </div>
       </div>
 
-      <h3>Selected Feature</h3>
-      <div style={{ 
-        padding: 10, 
-        background: selectedGlobalID ? '#fff4e6' : '#f0f0f0', 
-        borderRadius: 4, 
-        marginBottom: 20,
-        fontSize: 12
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 8 }}>GlobalID:</div>
-        <div style={{ 
-          fontFamily: 'monospace', 
-          fontSize: 12,
-          wordBreak: 'break-all',
-          color: selectedGlobalID ? '#333' : '#999'
-        }}>
-          {selectedGlobalID || 'Click a feature on the map'}
+      <h3>Feature Details</h3>
+      {featureDetailLoading && (
+        <div style={{ marginBottom: 12 }}>
+          <Loading />
         </div>
-      </div>
+      )}
+      {!selectedGlobalID && !featureDetailLoading && (
+        <div style={{ 
+          fontSize: 13, 
+          color: '#999', 
+          marginBottom: 20,
+          fontStyle: 'italic'
+        }}>
+          Click a feature on the map to view details
+        </div>
+      )}
+      {(projectName || projectNumber || createdUser || createdDate) && (
+        <div style={{ 
+          padding: 10, 
+          background: '#f0f7ff', 
+          borderRadius: 4, 
+          marginBottom: 20,
+          fontSize: 13
+        }}>
+          {selectedGlobalID && (
+            <div style={{ marginBottom: 6 }}>
+              <strong>Object ID:</strong> {selectedGlobalID}
+            </div>
+          )}
+          {projectName && (
+            <div style={{ marginBottom: 6 }}>
+              <strong>Project Name:</strong> {projectName}
+            </div>
+          )}
+          {projectNumber && (
+            <div style={{ marginBottom: 6 }}>
+              <strong>Project Number:</strong> {projectNumber}
+            </div>
+          )}
+          {createdUser && (
+            <div style={{ marginBottom: 6 }}>
+              <strong>Created By:</strong> {createdUser}
+            </div>
+          )}
+          {createdDate && (
+            <div style={{ marginBottom: 6 }}>
+              <strong>Created Date:</strong> {createdDate}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>Report Template:</label>
@@ -334,10 +455,8 @@ export default function Widget (props: AllWidgetProps<any>) {
         </Select>
       </div>
 
-      <h3>Vegetation Observation Report</h3>
-
       <Button type="primary" onClick={callApi} disabled={loading}>
-        {loading ? 'Downloading…' : 'Get Vegetation Observation Document'}
+        {loading ? 'Downloading…' : 'Get Report'}
       </Button>
 
       {loading && <div style={{ marginTop: 12 }}><Loading /></div>}
@@ -368,32 +487,6 @@ export default function Widget (props: AllWidgetProps<any>) {
             </a>
           </div>
         </div>
-      )}
-      
-      {useDataSourceId ? (
-        <>
-          <DataSourceComponent
-            useDataSource={props.useDataSources[0]}
-            onDataSourceCreated={onDataSourceCreated}
-          />
-          
-          {featureLayerLoading && <Loading />}
-          
-          {featureLayerRecords.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <p><strong>Records found: {featureLayerRecords.length}</strong></p>
-              <pre style={{ background: '#f6f6f6', padding: 10, maxHeight: 300, overflow: 'auto' }}>
-                {featureLayerRecords.map((record, idx) => (
-                  <div key={idx}>
-                    Record {idx + 1}: {JSON.stringify(record.getData(), null, 2)}
-                  </div>
-                ))}
-              </pre>
-            </div>
-          )}
-        </>
-      ) : (
-        <p style={{ color: '#666', fontStyle: 'italic' }}></p>
       )}
       
       {/* Connect to map widget */}
